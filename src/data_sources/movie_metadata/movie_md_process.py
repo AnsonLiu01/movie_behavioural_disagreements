@@ -1,0 +1,65 @@
+import pandas as pd
+
+
+class MovieMetaData:
+    """
+    Class for Movie metadata functions
+    """
+    def __init__(
+        self,
+        df: pd.DataFrame
+    ):
+        """
+        :param df: data frame include all raw movie metadata
+        """
+        self.df = df
+        
+    def process_col_names(self) -> None: 
+        """
+        Function to add column names to raw data frame
+        """
+        col_names = ['wiki_movie_id', 'freebase_movie_id', 'name', 'release_date', 'revenue', 'runtime', 'languages', 'countries', 'genres']
+        relevant_cols = ['name', 'release_date', 'revenue', 'runtime', 'genres']
+        
+        self.df.columns = col_names
+        
+        self.df = self.df[relevant_cols]
+        
+    def clean_data(self) -> None:
+        """
+        Function to clean and process the data
+        """
+        self.df["release_year"] = (
+            df["release_date"]
+            .astype(str)
+            .str.extract(r"(\d{4})")
+            .fillna('9999')
+            .astype(int)
+        )
+
+        self.df["genres_list"] = self.df["genres"].fillna("").astype(str).str.findall(r':\s*"([^"]+)"')
+
+        mask_dicts = self.df["genres"].apply(lambda x: isinstance(x, dict))
+        if mask_dicts.any():
+            self.df.loc[mask_dicts, "genres_list"] = self.df.loc[mask_dicts, "genres"].apply(lambda d: list(d.values()))
+
+        self.df["genres_list"] = self.df["genres_list"].apply(
+            lambda lst: [g.strip().lower() for g in dict.fromkeys(lst)] if isinstance(lst, list) else []
+        )
+        
+        self.df = self.df[['name', 'release_year', 'genres_list', 'revenue']]
+        
+    def preprocess_runner(self) -> None:
+        """
+        Sub-runner function for all preprocess functions
+        """
+        self.process_col_names()
+        
+        self.clean_data()
+    
+    def runner(self) -> None:
+        """
+        Main runner function
+        """
+        self.preprocess_runner()
+        
