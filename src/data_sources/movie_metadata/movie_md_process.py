@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 
 
@@ -7,12 +9,22 @@ class MovieMetaData:
     """
     def __init__(
         self,
-        df: pd.DataFrame
+        file_loc: str
     ):
         """
-        :param df: data frame include all raw movie metadata
+        :param file_loc : file location including base raw movie metadata
         """
-        self.df = df
+        self.file_loc = file_loc
+        
+        self.root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        
+        self.df = None
+    
+    def load_data(self) -> None:
+        """
+        Function to load data
+        """        
+        self.df = pd.read_csv(os.path.join(self.root_dir, 'data', self.file_loc))
         
     def process_col_names(self) -> None: 
         """
@@ -30,7 +42,7 @@ class MovieMetaData:
         Function to clean and process the data
         """
         self.df["release_year"] = (
-            df["release_date"]
+            self.df["release_date"]
             .astype(str)
             .str.extract(r"(\d{4})")
             .fillna('9999')
@@ -53,8 +65,10 @@ class MovieMetaData:
         """
         Sub-runner function for all preprocess functions
         """
-        self.process_col_names()
+        self.load_data()
         
+        self.process_col_names()
+
         self.clean_data()
     
     def runner(self) -> None:
