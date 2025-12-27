@@ -1,6 +1,10 @@
-from src.data_sources.movie_metadata.movie_md_process import MovieMetaData
+from __runner__ import Runner
 
 if __name__ == '__main__':
-    md = MovieMetaData('raw_movie_meta.csv')
     
-    md.runner()
+    run_type = 'ingest' # run_type's ingest or model
+    
+    run = Runner(run_type=run_type)
+    
+    run.run()
+    
