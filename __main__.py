@@ -1,4 +1,4 @@
-from __runner__ import Runner
+from src.__runner__ import Runner
 
 if __name__ == '__main__':
     
