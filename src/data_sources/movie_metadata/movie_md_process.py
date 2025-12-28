@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 
 import pandas as pd
@@ -25,21 +26,34 @@ class MovieMetaData:
         Function to load data
         """        
         self.df = pd.read_csv(os.path.join(self.root_dir, 'data', self.file_loc))
-                
+                        
     def clean_data(self) -> None:
         """
         Function to clean and process the data
         """
         keep_cols = [
-            'title', 'release_date', 'revenue', 'budget', 'genres', 'production_companies', 'production_countries', 'keywords', 'overview'
+            'id', 'title', 'release_date', 'revenue', 'budget', 'genres', 'production_companies', 'production_countries', 'keywords', 'overview'
         ]
         
         self.df = self.df[keep_cols]
+                
+        self.df = self.df.dropna(how="any")
         
-        self.df['release'] = self.df['release_date'].str.split('-')[0].astype(int)
+        self.df = self.df.loc[self.df['production_countries'].str.contains('United States of America')]
         
-        self.df = self.df.drop(columns=['release_date'])
+        self.df = self.df.drop_duplicates(subset=['id']) 
         
+        self.df.loc[:, 'release_year'] = (
+            pd.to_datetime(self.df['release_date'], format='%Y-%m-%d')
+            .dt.year
+        )
+        
+        self.df = self.df.loc[(self.df['release_year'] >= 2000) & (self.df['release_date'] <= datetime.today().strftime('%Y-%m-%d'))].copy()
+        
+        self.df = self.df[self.df['revenue'] >= self.df['revenue'].quantile(0.9)]
+        
+        self.df = self.df.reset_index(drop=True)
+                
     def preprocess_runner(self) -> None:
         """
         Sub-runner function for all preprocess functions
@@ -48,9 +62,12 @@ class MovieMetaData:
         
         self.clean_data()
     
-    def runner(self) -> None:
+    def runner(self) -> pd.DataFrame:
         """
         Main runner function
+        :return: data frame with cleaned TMDB data
         """
         self.preprocess_runner()
+        
+        return self.df
         
