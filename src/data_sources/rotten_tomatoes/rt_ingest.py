@@ -11,6 +11,9 @@ from tqdm import tqdm
 import pandas as pd
 import numpy as np
 from loguru import logger
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
+
 
 from src.utils.scraper_utils import ScraperUtility
 from src.utils.error_utils import InvalidScrapeTypeError
@@ -33,6 +36,8 @@ class RottenTomatoes(ScraperUtility):
         
         self.url_base = 'https://www.rottentomatoes.com'
         self.root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        
+        self.threading_lock = Lock()  # Add a lock for thread-safe DataFrame writes
         
         self.df = None
         self.formatted_releases_dict = None
@@ -116,12 +121,42 @@ class RottenTomatoes(ScraperUtility):
 
         return response
 
+    def get_ttm_ppm_parallel(
+        self, 
+        id: int, 
+        formatted_release: str, 
+        ):
+        """
+        Function to process a single release, this function is to used in parallel
+        :param id: id of movie
+        :param formatted_release: formatted string of movie release name
+        """
+        release = self.raw_releases_dict[id]
+        response = self.make_request(release=release, scrape_type='url_match', formatted_release=formatted_release)
+        scrape_type = self.verify_release(release, response)
+
+        if scrape_type == 'url_match':
+            self.scrape_scores(id=id, release=release, response=response, scrape_type='url_match')
+        elif scrape_type == 'url_search':
+            r_dt = self.tmdb_df.loc[self.tmdb_df['title'] == release, 'release_year'].to_string(index=False)
+            self.search_and_scrape_scores(
+                id=id,
+                release=release,
+                formatted_release=formatted_release,
+                tmdb_release_date=r_dt,
+                scrape_type='url_search'
+            )
+        else:
+            raise InvalidScrapeTypeError('scrape_type must be url_match, url_search or manual_add')
+        
+        return id, self.formatted_releases_dict[id]  # Return id for tracking
+
     def get_tomatometer_and_popcornmeter(self) -> None:
         """
         Function to get the tomato-meter & 'popcornmeter' (audience scores) for each of the target releases
         """
         logger.info(f'Scraping for {self.df.shape[0]} movies')
-        
+                
         self.scores_df = self.df[['id', 'title']].copy()
 
         new_cols = ['Tomatometer', 'Popcornmeter', 'scrape_type']
@@ -133,26 +168,22 @@ class RottenTomatoes(ScraperUtility):
             'release_found': [],
             'release_not_found': []
         }
-
-        for id, formatted_release in tqdm(self.formatted_releases_dict.items(), leave=True):
-            release = self.raw_releases_dict[id]
-            response = self.make_request(release=release, scrape_type='url_match', formatted_release=formatted_release)
-            scrape_type = self.verify_release(release, response)
-
-            if scrape_type == 'url_match':
-                self.scrape_scores(id=id, release=release, response=response, scrape_type='url_match')
-            elif scrape_type == 'url_search':
-                r_dt = self.tmdb_df.loc[self.tmdb_df['title'] == release, 'release_year'].to_string(index=False)
-                self.search_and_scrape_scores(
-                    id=id,
-                    release=release,
-                    formatted_release=formatted_release,
-                    tmdb_release_date=r_dt,
-                    scrape_type='url_search'
-                )
-            else:
-                raise InvalidScrapeTypeError('scrape_type must be url_match, url_search or manual_add')
-
+        
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            # Submit all tasks
+            futures = {
+                executor.submit(self.get_ttm_ppm_parallel, id, formatted_release): id
+                for id, formatted_release in self.formatted_releases_dict.items()
+            }
+            
+            for future in tqdm(as_completed(futures), total=len(futures), leave=True):
+                try:
+                    result = future.result()  # This will raise any exceptions that occurred
+                except Exception as e:
+                    id = futures[future]
+                    release = self.formatted_releases_dict[futures[future]]
+                    print(f"\nError processing id {id} ({release}): {e}") 
+                    
         low_confidence_movies = self.scores_df.loc[
             self.scores_df['Tomatometer'] == '200 - Low confidence in movie found', 'title'].to_list()
 
@@ -244,10 +275,11 @@ class RottenTomatoes(ScraperUtility):
 
             scraped_scores[score_type] = matches if matches else 'No score'
 
-        for col_name, value in scraped_scores.items():
-            self.scores_df.loc[self.scores_df['id'] == id, col_name] = value
+        with self.threading_lock:
+            for col_name, value in scraped_scores.items():
+                self.scores_df.loc[self.scores_df['id'] == id, col_name] = value
 
-        self.release_found_log['release_found'].append(release)
+            self.release_found_log['release_found'].append(release)
         # logger.debug(f'{release} - {scrape_type} - found')
 
     def search_and_scrape_scores(
@@ -415,9 +447,9 @@ class RottenTomatoes(ScraperUtility):
         :return: model-formatted dataframe with rotten tomatoes scores
         """
         self.format_releases()
-
+        
         self.get_tomatometer_and_popcornmeter()
-
+        
         self.create_model_formatted_input()
 
         self.save()
