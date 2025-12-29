@@ -56,7 +56,7 @@ class MovieMetaData:
         
         self.df = self.df.loc[(self.df['release_year'] >= 2000) & (self.df['release_date'] <= datetime.today().strftime('%Y-%m-%d'))].copy()
         
-        self.df = self.df[self.df['revenue'] >= self.df['revenue'].quantile(0.75)]
+        self.df = self.df[self.df['revenue'] >= self.df['revenue'].quantile(0.9)]
         
         self.df = self.df.reset_index(drop=True)
         
