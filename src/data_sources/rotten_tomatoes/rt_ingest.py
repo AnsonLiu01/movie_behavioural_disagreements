@@ -146,8 +146,10 @@ class RottenTomatoes(ScraperUtility):
                 tmdb_release_date=r_dt,
                 scrape_type='url_search'
             )
+        elif scrape_type == 'previous_search':
+            logger.debug(f'Release {id} - {release}: previously found, skipping')
         else:
-            raise InvalidScrapeTypeError('scrape_type must be url_match, url_search or manual_add')
+            raise InvalidScrapeTypeError('scrape_type must be url_match or url_search')
         
         return id, self.formatted_releases_dict[id]  # Return id for tracking
 
@@ -169,7 +171,7 @@ class RottenTomatoes(ScraperUtility):
             'release_not_found': []
         }
         
-        with ThreadPoolExecutor(max_workers=20) as executor:
+        with ThreadPoolExecutor(max_workers=50) as executor:
             # Submit all tasks
             futures = {
                 executor.submit(self.get_ttm_ppm_parallel, id, formatted_release): id
@@ -218,7 +220,7 @@ class RottenTomatoes(ScraperUtility):
                     self.movie_name_conflict_list.append(release)
                     return 'url_search'
             else:
-                return None  # Skipping since release already searched for
+                return 'previous_search' # Skipping since release already searched for
         else:
             return 'url_search'
 
