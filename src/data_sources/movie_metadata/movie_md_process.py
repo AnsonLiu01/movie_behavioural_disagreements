@@ -2,6 +2,7 @@ from datetime import datetime
 import os
 
 import pandas as pd
+from loguru import logger
 
 
 class MovieMetaData:
@@ -24,13 +25,18 @@ class MovieMetaData:
     def load_data(self) -> None:
         """
         Function to load data
-        """        
-        self.df = pd.read_csv(os.path.join(self.root_dir, 'data', self.file_loc))
+        """
+        file = os.path.join(self.root_dir, 'data', self.file_loc)
+        logger.info(f'Loading main TMDB file: {file}')
+             
+        self.df = pd.read_csv(file)
                         
     def clean_data(self) -> None:
         """
         Function to clean and process the data
         """
+        logger.info('Cleaning data')
+        
         keep_cols = [
             'id', 'title', 'release_date', 'revenue', 'budget', 'genres', 'production_companies', 'production_countries', 'keywords', 'overview'
         ]
@@ -53,6 +59,8 @@ class MovieMetaData:
         self.df = self.df[self.df['revenue'] >= self.df['revenue'].quantile(0.9)]
         
         self.df = self.df.reset_index(drop=True)
+        
+        logger.info(f'Cleaned data movie count: {self.df["id"].nunique()}')
                 
     def preprocess_runner(self) -> None:
         """
