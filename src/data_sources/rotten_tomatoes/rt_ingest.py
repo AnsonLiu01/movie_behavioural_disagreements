@@ -386,14 +386,9 @@ class RottenTomatoes(ScraperUtility):
         for col in model_cols:
             self.final_df[col] = self.final_df[col].astype(str)
             self.final_df[col] = self.final_df[col].str.replace(pattern, 'No score', regex=True)
-            self.final_df.loc[self.final_df[col].str.contains('no score', na=False, case=False), col] = 0
+            self.final_df = self.final_df.loc[~self.final_df[col].str.contains('no score', na=False, case=False)]
             self.final_df[col] = self.final_df[col].astype(int)
         
-        valid_t_score = (self.final_df['Tomatometer'] != 0)
-        valid_p_score = (self.final_df['Popcornmeter'] != 0)
-        
-        self.final_df = self.final_df.loc[valid_t_score & valid_p_score]
-
     def save(self) -> None:
         """
         Function to save rotten tomatoes scores df to csv
