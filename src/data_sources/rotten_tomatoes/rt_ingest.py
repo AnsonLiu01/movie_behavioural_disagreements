@@ -169,7 +169,7 @@ class RottenTomatoes(ScraperUtility):
             'release_not_found': []
         }
         
-        with ThreadPoolExecutor(max_workers=4) as executor:
+        with ThreadPoolExecutor(max_workers=20) as executor:
             # Submit all tasks
             futures = {
                 executor.submit(self.get_ttm_ppm_parallel, id, formatted_release): id
@@ -419,6 +419,7 @@ class RottenTomatoes(ScraperUtility):
             self.final_df[col] = self.final_df[col].astype(str)
             self.final_df[col] = self.final_df[col].str.replace(pattern, 'No score', regex=True)
             self.final_df = self.final_df.loc[~self.final_df[col].str.contains('no score', na=False, case=False)]
+            self.final_df = self.final_df.loc[~self.final_df[col].str.contains('nan', na=False, case=False)]
             self.final_df[col] = self.final_df[col].astype(int)
         
     def save(self) -> None:
