@@ -418,11 +418,11 @@ class RottenTomatoes(ScraperUtility):
         model_cols = ['Tomatometer', 'Popcornmeter']
 
         for col in model_cols:
-            self.final_df[col] = self.final_df[col].astype(str)
-            self.final_df[col] = self.final_df[col].str.replace(pattern, 'No score', regex=True)
-            self.final_df = self.final_df.loc[~self.final_df[col].str.contains('no score', na=False, case=False)]
-            self.final_df = self.final_df.loc[~self.final_df[col].str.contains('nan', na=False, case=False)]
-            self.final_df[col] = self.final_df[col].astype(int)
+            self.final_df.loc[:, col] = self.final_df.loc[:, col].astype(str)
+            self.final_df.loc[:, col] = self.final_df.loc[:, col].str.replace(pattern, 'No score', regex=True)
+            self.final_df = self.final_df.loc[~self.final_df[col].str.strip().str.contains(
+                    r'^(no score|na|nan)$', case=False, na=False)]
+            self.final_df.loc[:, col] = self.final_df.loc[:, col].astype(int)
         
     def save(self) -> None:
         """
